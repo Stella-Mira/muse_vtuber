@@ -1,0 +1,18 @@
+# 系统 / 临时
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.log
+*.tmp
+*.bak
+*.bak-before-*
+__pycache__/
+*.pyc
+
+# 依赖（DSH 以 link 方式装入，无需随库分发）
+node_modules/
+
+# 私有：登录脚本、导出的 cookie、本机凭据
+_secrets/
+creds/
+*.cookies.json

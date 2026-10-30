@@ -1,0 +1,48 @@
+{
+  "name": "muse_vtuber",
+  "version": "3.1.0",
+  "description": "DSH 界面交互（形象）：对话/轨迹之后的「形象」页签（LIVE2D 主位 + 视频/音频/表情侧边栏）、输入框摄像头与麦克风按钮、语音识别与图像识别事件流（插话 steer）、阿里云 TTS/ASR/识图与设置页",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "files": [
+    "lib",
+    "assets",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "live2d",
+    "avatar",
+    "tts",
+    "asr",
+    "vision"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stella-Mira/muse_vtuber.git"
+  }
+}

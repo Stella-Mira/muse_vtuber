@@ -1,0 +1,48 @@
+# muse_vtuber -- DSH GUI "avatar" view (bundle patch)
+#
+# ASCII only on purpose: the Loader reads this at startup and this machine's
+# console tooling mixes code pages (GBK vs UTF-8).
+#
+# This file is only the BASELINE. The authoritative config is
+#   $DSH_HOME/mira_config/muse_vtuber/config.json
+# which the settings page ("Settings - Avatar") writes and which wins from then
+# on. Every default below is documented in README.md (config table); required
+# values (the Aliyun API key) are NEVER stored here -- the key lives in
+#   $DSH_HOME/mira_config/muse_vtuber/creds/dashscope.json  (mode 600)
+#
+# legacyNode: the old external "stella muse_vtuber node" bridge (v2 feature, not
+# part of the task book). Kept as lib/legacy/node-bridge.js, not loaded unless
+# enabled here; when enabling, put the whole old config under legacyNode.config.
+- insert:
+    - id: muse_vtuber
+      name: muse_vtuber
+      config:
+        enabled: true
+        live2d:
+          modelsDir: ''
+          model: ''
+        camera:
+          enabled: true
+        mic:
+          enabled: true
+        tts:
+          enabled: true
+          provider: aliyun
+          base: 'https://token-plan.maas.qianwenaiapi.com/api/v1'
+          model: qwen-audio-3.0-tts-plus
+          voice: longanhuan_v3.6
+        asr:
+          enabled: true
+          provider: aliyun
+          base: 'https://token-plan.maas.qianwenaiapi.com/api/v1'
+          model: qwen-audio-3.0-asr-flash
+          language: zh
+        vision:
+          enabled: true
+          base: 'https://token-plan.maas.qianwenaiapi.com/api/v1'
+          model: qwen3.8-flash
+        events:
+          enabled: true
+          steer: true
+        legacyNode:
+          enabled: false
