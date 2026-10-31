@@ -1,6 +1,6 @@
 # muse_vtuber — DSH 界面交互（形象）
 
-任务书 §muse_vtuber 的实现。**4.0.0 起它只负责"画"**：给 DSH GUI 加一个**「形象」页签**
+任务书 §muse_vtuber 的实现。**4.0.0 起它只负责"画"（4.1.0 起连账号模型也去掉）**：给 DSH GUI 加一个**「形象」页签**
 （对话 / 轨迹之后）——主位是 LIVE2D（说话时口型跟着音量动；没模型时频谱环兜底），
 右侧栏自上而下是**视频 / 音频 / LIVE2D 表情**；设置页叫**「形象」**。
 
@@ -12,7 +12,7 @@ muse_vtuber（本插件）──→ mira_input ──→ mira_audio
    表情/动作/模型/权限    采集器/自动推帧       （唯一一份阿里云 key）
 ```
 
-- 版本：**4.0.0**（3.1.0 是拆分前的单体；更早的 2.0.1 是「外部 stella 节点」桥，见 §10）
+- 版本：**4.1.0**（4.0.0 拆分出三件套并删除账号权限；3.1.0 是拆分前的单体；更早的 2.0.1 是「外部 stella 节点」桥，见 §10）
 - 位置：`PluginDSH/muse_vtuber`
 - 依赖：**零第三方依赖**；`assets/lib/` 是 LIVE2D 运行库（见 `THIRD-PARTY-NOTICES`）
 - 宿主依赖（`inject`）：`tools`、`webServer`、**`miraAudio`**、**`miraInput`**
@@ -63,12 +63,6 @@ $DSH_HOME/mira_config/muse_vtuber/
 | `live2d.modelsDir` | `""` | 留空 = 依次找 `mira_config/muse_vtuber/model` → `mira_config/mira_live2d/model`。手填绝对路径优先 |
 | `live2d.model` | `""` | 要显示的模型（目录名或 `*.model3.json`）。**留空 = 不显示模型**（只剩频谱环）；设置页选完保存会**立即切换** |
 | `live2d.width` / `height` | `420` / `560` | 初始画布尺寸（CSS 像素），实际随容器缩放 |
-| `security.mode` | `enforce` | `enforce` = 按 mira_account 的绑定判权；`off` = 全放开（兜底开关） |
-| `security.accountId` | `vtuber-main` | 在 mira_account 里的账号 id |
-| `security.peerKind` / `peerId` | `avatar` / `main` | peer 是形象本身 |
-| `security.cacheMs` | `30000` | 判定缓存；0 = 每次都查 |
-| `security.autoClaim` | `true` | 首次控制自动认领 taker |
-| `security.autoObserve` | `true` | 没绑定的会话第一次接收时自动登记 observer |
 | `legacyNode.enabled` | `false` | 旧的外部节点桥（见 §10），默认不加载 |
 | `ui.showHint` | `true` | 首次进入给操作提示 |
 
@@ -76,29 +70,19 @@ $DSH_HOME/mira_config/muse_vtuber/
 > **不再被读取**，但会原样留在 `config.json` 里（前向兼容）；对应能力分别搬到了
 > `mira_input` / `mira_audio`（见 §9）。
 
-## 4. 工具（5 个）与权限
+## 4. 工具（5 个）
 
-**「形象是一个账号」**：vtuber 在 `mira_account` 里是一个本地虚拟账号（`platform: 'vtuber'`），
-peer 是形象本身（`avatar/main`），会话是绑定的主体（一个 taker + 多个 observer）。
-4.0.0 起权限只约束**形象长什么样**（外观控制）；说话（`audio_say`）与输入（`input_*`）
-已经不是这个插件的能力，也就不在这里判权。
+**没有权限模型**（4.1.0 起）：形象是纯展示面，任何会话都能调这 5 个工具，不再需要
+`mira_account`、不再有 taker/observer/`force`。旧版那套「形象是一个账号」的绑定模型已整个删除
+（真要防多会话打架，等需要时再加一个内存认领，不必把账号池拉进来）。
 
-| 工具 | 权限 | 干什么 |
-|---|---|---|
-| `vtuber_status` | 只读 | 只读：形象状态（可见性/模型/表情/开关/动作）、模型清单与**缺失资源**、连着的页面数、`security`（你是谁/能不能控），并转述 `audio`（TTS/ASR/key）与 `input`（开关/采集器/识图）状态 |
-| `vtuber_expression` | **taker** | 表情三件套：`name`（互斥）/ `toggles`（整体替换叠加开关）/ `switch`+`on`。未知名字 → `expression/unknown` + 清单，**状态原样不动** |
-| `vtuber_motion` | **taker** | 播放动作组；不传 = 列清单 |
-| `vtuber_visible` | **taker** | 显示/隐藏形象主体（频谱环仍在） |
-| `vtuber_model` | **taker** | 切模型；不传 = 列清单；`clear:true` = 只留频谱环 |
-
-规则：首次控制自动认领 taker；被别人占着报 `authz/conflict`（加 `force:true` 抢，旧 taker 降级
-observer）；`mira_account` 缺席 → 全禁止（`authz/unavailable`）；`security.mode='off'` 临时放开。
-
-一次性准备（装好 mira_account 之后）：
-
-```
-mira_account_add { id: "vtuber-main", platform: "vtuber", label: "形象" }
-```
+| 工具 | 干什么 |
+|---|---|
+| `vtuber_status` | 只读：形象状态（可见性/模型/表情/开关/动作）、模型清单与**缺失资源**、连着的页面数，并转述 `audio`（TTS/ASR/key）与 `input`（开关/采集器/识图）状态 |
+| `vtuber_expression` | 表情三件套：`name`（互斥）/ `toggles`（整体替换叠加开关）/ `switch`+`on`。未知名字 → `expression/unknown` + 清单，**状态原样不动** |
+| `vtuber_motion` | 播放动作组；不传 = 列清单 |
+| `vtuber_visible` | 显示/隐藏形象主体（频谱环仍在） |
+| `vtuber_model` | 切模型；不传 = 列清单；`clear:true` = 只留频谱环 |
 
 ## 5. 宿主 HTTP 面（`/vtuber/api/*`，全部同源校验）
 
@@ -147,7 +131,7 @@ vtuber_status → models.missing: [{ file: "SylviaMuse.4096/texture_02.png", why
 其余（`表情-*`）互斥。叠加是把"当前互斥表情 + 所有打开的开关"合成一个 `ExpressionMotion`，
 经 `expressionManager` 的官方队列应用。
 
-## 8. 迁移：3.1.0（单体）→ 4.0.0（三件套）
+## 8. 迁移：3.1.0（单体）→ 4.0.0（三件套）→ 4.1.0（去掉账号）
 
 | 旧位置 | 新位置 |
 |---|---|

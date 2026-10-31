@@ -116,39 +116,6 @@ class FakeRes {
   }
 }
 
-/** 假 mira_account：vtuber 的权限判定只用 resolve/bind 两个方法。 */
-function makeAccountBook() {
-  return {
-    bindings: new Map(),
-    resolve(accountId, kind, peerId) {
-      const row = this.bindings.get(accountId + '|' + kind + '|' + peerId)
-      if (!row) return { taker: null, observers: [] }
-      return {
-        taker: row.taker ? { sessionId: row.taker } : null,
-        observers: [...row.observers].map((s) => ({ sessionId: s })),
-      }
-    },
-    bind({ sessionId, accountId, kind, peerId, mode = 'taker', force = false }) {
-      const key = accountId + '|' + kind + '|' + peerId
-      const row = this.bindings.get(key) || { taker: '', observers: new Set() }
-      if (mode === 'observer') {
-        if (row.taker === sessionId) row.taker = ''
-        row.observers.add(sessionId)
-        this.bindings.set(key, row)
-        return { ok: true, action: 'observer' }
-      }
-      if (row.taker && row.taker !== sessionId && !force) {
-        throw Object.assign(new Error('binding/conflict'), { code: 'binding/conflict' })
-      }
-      if (row.taker && row.taker !== sessionId && force) row.observers.add(row.taker)
-      row.taker = sessionId
-      row.observers.delete(sessionId)
-      this.bindings.set(key, row)
-      return { ok: true, action: 'taker' }
-    },
-  }
-}
-
 /** 假 miraAudio：只需要 status()/vad()（形象只转述，不用它识别）。 */
 const FAKE_AUDIO = {
   status() {
@@ -182,11 +149,10 @@ const FAKE_INPUT = {
   },
 }
 
-function makeCtx({ withAudio = true, withInput = true, withAccount = true } = {}) {
+function makeCtx({ withAudio = true, withInput = true } = {}) {
   const registered = new Map()
   const routes = []
   const disposers = []
-  const accounts = makeAccountBook()
   const ctx = {
     logger: { info() {}, warn() {}, error() {}, debug() {} },
     tools: {
@@ -204,16 +170,12 @@ function makeCtx({ withAudio = true, withInput = true, withAccount = true } = {}
         }
       },
     },
-    get(name) {
-      return name === 'miraAccount' && withAccount ? accounts : undefined
-    },
     effect(fn) {
       disposers.push(fn())
       return () => {}
     },
     registered,
     routes,
-    accounts,
     dispose() {
       for (const dispose of disposers.splice(0)) {
         try {
@@ -239,7 +201,6 @@ const modelsMod = await import('../lib/models.js')
 const hubMod = await import('../lib/hub.js')
 const routesMod = await import('../lib/routes.js')
 const toolsMod = await import('../lib/tools.js')
-const authzMod = await import('../lib/authz.js')
 const indexMod = await import('../lib/index.js')
 
 const BASE = kit.miraConfigDir('muse_vtuber')
@@ -264,7 +225,6 @@ await t('B1 默认值只剩形象相关的几段', () => {
   assert.equal(value.live2d.width, 420)
   assert.equal(value.live2d.height, 560)
   assert.equal(value.live2d.model, '')
-  assert.equal(value.security.mode, 'enforce')
   assert.equal(value.ui.showHint, true)
   // 旧版那些键不再是"本插件默认"，但旧配置里写了也会原样留着
   assert.equal(value.tts, undefined)
@@ -633,11 +593,10 @@ await t('G7 未知接口：404 并指到 bootstrap', async () => {
  * H. 工具
  * ══════════════════════════════════════════════════════════ */
 
-async function makeToolEnv({ security = null, withAccount = true } = {}) {
+async function makeToolEnv() {
   const base = join(SANDBOX, 'tools-' + Math.random().toString(36).slice(2, 8))
   const configStore = new configMod.ConfigStore({ baseDir: base, patch: { live2d: { modelsDir: MODELS_DIR } } })
   configStore.load()
-  if (security) configStore.save({ security })
   const stateStore = new stateMod.StateStore({ baseDir: base })
   stateStore.load()
   const counters = kit.makeCounters()
@@ -662,17 +621,11 @@ async function makeToolEnv({ security = null, withAccount = true } = {}) {
       }
     },
   }
-  const accounts = makeAccountBook()
-  const authorizer = new authzMod.Authorizer({
-    config: () => configStore.current(),
-    account: () => (withAccount ? accounts : null),
-  })
   const deps = {
     configStore,
     stateStore,
     hub,
     catalog,
-    authorizer,
     assetsDir: join(ROOT, 'assets'),
     logger: { info() {}, warn() {}, debug() {} },
     counters,
@@ -680,11 +633,11 @@ async function makeToolEnv({ security = null, withAccount = true } = {}) {
     inputStatus: () => FAKE_INPUT.status(),
   }
   deps.statusView = () => toolsMod.statusView(deps)
-  const ctx = makeCtx({ withAccount: false })
+  const ctx = makeCtx({})
   const dispose = toolsMod.registerTools(ctx, deps)
   const clientRes = new FakeRes()
   hub.attach(new FakeReq({ headers: {} }), clientRes)
-  return { ctx, deps, dispose, hub, registered: ctx.registered, stateStore, configStore, accounts, clientRes }
+  return { ctx, deps, dispose, hub, registered: ctx.registered, stateStore, configStore, clientRes }
 }
 
 await t('H1 注册 5 个工具', async () => {
@@ -703,7 +656,7 @@ await t('H2 vtuber_status：只读、带模型清单/依赖状态/权限角色',
   assert.ok(Array.isArray(json.models.models))
   assert.equal(json.audio.configured, true)
   assert.equal(json.input.state.cameraOn, true)
-  assert.equal(json.security.role, 'none')
+  assert.equal(json.security, undefined)
   assert.equal(JSON.stringify(json).includes('sk-'), false)
   env.dispose()
   env.hub.dispose()
@@ -762,49 +715,6 @@ await t('H5 没选模型时：表情/动作报 model/none，而不是拿清单�
 
 /* ══════════════════════════════════════════════════════════
  * I. 「形象是一个账号」的权限
- * ══════════════════════════════════════════════════════════ */
-
-await t('I1 没装 mira_account：控制类全禁止（authz/unavailable），status 不受影响', async () => {
-  const env = await makeToolEnv({ withAccount: false })
-  const json = parse(await env.registered.get('vtuber_visible').execute({ on: true }, execFor('sess-a')))
-  assert.equal(json.ok, false)
-  assert.equal(json.error.code, 'authz/unavailable')
-  const status = parse(await env.registered.get('vtuber_status').execute({}, execFor('sess-a')))
-  assert.equal(status.ok, true)
-  assert.equal(status.security.available, false)
-  env.dispose()
-  env.hub.dispose()
-})
-
-await t('I2 首次控制自动认领 taker；别人占着报冲突；force 可抢', async () => {
-  const env = await makeToolEnv({ security: { mode: 'enforce' } })
-  const first = parse(await env.registered.get('vtuber_visible').execute({ on: true }, execFor('sess-a')))
-  assert.equal(first.ok, true)
-  assert.equal(env.accounts.resolve('vtuber-main', 'avatar', 'main').taker.sessionId, 'sess-a')
-  const second = parse(await env.registered.get('vtuber_visible').execute({ on: false }, execFor('sess-b')))
-  assert.equal(second.ok, false)
-  assert.equal(second.error.code, 'authz/conflict')
-  assert.ok(String(second.error.message).includes('sess-a'))
-  const forced = parse(await env.registered.get('vtuber_visible').execute({ on: false, force: true }, execFor('sess-b')))
-  assert.equal(forced.ok, true)
-  assert.equal(env.accounts.resolve('vtuber-main', 'avatar', 'main').taker.sessionId, 'sess-b')
-  env.dispose()
-  env.hub.dispose()
-})
-
-await t('I3 security.mode=off：整体跳过（兜底开关）', async () => {
-  const env = await makeToolEnv({ security: { mode: 'off' }, withAccount: false })
-  const json = parse(await env.registered.get('vtuber_visible').execute({ on: true }, execFor('sess-x')))
-  assert.equal(json.ok, true)
-  const status = parse(await env.registered.get('vtuber_status').execute({}, execFor('sess-x')))
-  assert.equal(status.security.mode, 'off')
-  assert.equal(status.security.control, true)
-  env.dispose()
-  env.hub.dispose()
-})
-
-/* ══════════════════════════════════════════════════════════
- * J. 入口装配
  * ══════════════════════════════════════════════════════════ */
 
 await t('J1 apply：注册 5 个工具 + /vtuber 路由，返回装配信息', () => {

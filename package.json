@@ -1,7 +1,7 @@
 {
   "name": "muse_vtuber",
-  "version": "4.0.0",
-  "description": "DSH 界面交互（形象）：对话/轨迹之后的「形象」页签（LIVE2D 主位 + 频谱环，右侧栏视频/音频来自 mira_input）；表情/动作/显隐/模型工具与「形象是一个账号」的权限；设置页「形象」。说话与输入分别由 mira_audio / mira_input 提供（本插件依赖它们）",
+  "version": "4.1.0",
+  "description": "DSH 界面交互（形象）：对话/轨迹之后的「形象」页签（LIVE2D 主位 + 频谱环，右侧栏视频/音频来自 mira_input）；表情/动作/显隐/模型 5 个工具与设置页「形象」。说话与输入分别由 mira_audio / mira_input 提供；4.1.0 起不再有账号/权限模型",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
