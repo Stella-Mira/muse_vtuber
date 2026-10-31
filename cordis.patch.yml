@@ -5,10 +5,15 @@
 #
 # This file is only the BASELINE. The authoritative config is
 #   $DSH_HOME/mira_config/muse_vtuber/config.json
-# which the settings page ("Settings - Avatar") writes and which wins from then
-# on. Every default below is documented in README.md (config table); required
-# values (the Aliyun API key) are NEVER stored here -- the key lives in
-#   $DSH_HOME/mira_config/muse_vtuber/creds/dashscope.json  (mode 600)
+# which the settings page ("Settings - Avatar") writes and which wins from then on.
+# Every default below is documented in README.md (config table).
+#
+# Split (2026-11-01): this plugin now only draws the avatar.
+#   * speech (TTS / ASR / VAD) lives in mira_audio   -> /audio/api/*,  config mira_config/mira_audio
+#   * camera / mic / virtual capture lives in mira_input -> /input/api/*, config mira_config/mira_input
+#   * the Aliyun API key lives in mira_audio (creds/dashscope.json, mode 600)
+# Old keys (camera/mic/tts/asr/vision/capture/events) may still sit in an existing
+# config.json; they are left untouched but no longer read here (see README "migration").
 #
 # legacyNode: the old external "stella muse_vtuber node" bridge (v2 feature, not
 # part of the task book). Kept as lib/legacy/node-bridge.js, not loaded unless
@@ -21,28 +26,5 @@
         live2d:
           modelsDir: ''
           model: ''
-        camera:
-          enabled: true
-        mic:
-          enabled: true
-        tts:
-          enabled: true
-          provider: aliyun
-          base: 'https://token-plan.maas.qianwenaiapi.com/api/v1'
-          model: qwen-audio-3.0-tts-plus
-          voice: longanhuan_v3.6
-        asr:
-          enabled: true
-          provider: aliyun
-          base: 'https://token-plan.maas.qianwenaiapi.com/api/v1'
-          model: qwen-audio-3.0-asr-flash
-          language: zh
-        vision:
-          enabled: true
-          base: 'https://token-plan.maas.qianwenaiapi.com/api/v1'
-          model: qwen3.8-flash
-        events:
-          enabled: true
-          steer: true
         legacyNode:
           enabled: false
