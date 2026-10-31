@@ -7,7 +7,7 @@
 声音与输入已经拆成两个可复用插件（2026-11-01）：
 
 ```
-muse_vtuber（本插件）──→ mira_input ──→ mira_audio
+muse_vtuber（本插件）──→ mira_device ──→ mira_media
    画 LIVE2D、右侧栏、    摄像头/麦克风/       TTS/ASR/VAD/凭据
    表情/动作/模型/权限    采集器/自动推帧       （唯一一份阿里云 key）
 ```
@@ -15,7 +15,7 @@ muse_vtuber（本插件）──→ mira_input ──→ mira_audio
 - 版本：**4.1.0**（4.0.0 拆分出三件套并删除账号权限；3.1.0 是拆分前的单体；更早的 2.0.1 是「外部 stella 节点」桥，见 §10）
 - 位置：`PluginDSH/muse_vtuber`
 - 依赖：**零第三方依赖**；`assets/lib/` 是 LIVE2D 运行库（见 `THIRD-PARTY-NOTICES`）
-- 宿主依赖（`inject`）：`tools`、`webServer`、**`miraAudio`**、**`miraInput`**
+- 宿主依赖（`inject`）：`tools`、`webServer`、**`miraMedia`**、**`miraDevice`**
 
 ---
 
@@ -25,10 +25,10 @@ muse_vtuber（本插件）──→ mira_input ──→ mira_audio
 |---|---|
 | 1 新界面「形象」在「对话」「轨迹」之后 | 注册 `conversation.view`，`id:"muse-avatar"`、`order:20` |
 | 2 形象主体 + 侧边栏 | 左侧 `.mv-main`（LIVE2D 舞台 + 气泡），右侧 `.mv-side` |
-| 3 主位 LIVE2D；侧边栏自上而下 视频 / 音频 / 表情菜单 | `VideoPanel` → `AudioPanel` → `ExpressionPanel`（数据来自 `mira_input`） |
-| 5 摄像头关 → 视频黑屏；开 → 显示捕获画面 | 面板读 `window.__miraInput__` 的流/来源；采集器源走 `/input/api/stream.mjpg` |
-| 6 麦克风关 → 音频直线；开 → 显示波形 | 波形用 `mira_input` 的 AnalyserNode；采集器源用宿主推的 RMS |
-| 7 识别结果插话 / TTS 说话 | **插话在 `mira_input`**；**说话在 `mira_audio`**（`audio_say`），形象订阅 `say` 做气泡 + 口型 |
+| 3 主位 LIVE2D；侧边栏自上而下 视频 / 音频 / 表情菜单 | `VideoPanel` → `AudioPanel` → `ExpressionPanel`（数据来自 `mira_device`） |
+| 5 摄像头关 → 视频黑屏；开 → 显示捕获画面 | 面板读 `window.__miraDevice__` 的流/来源；采集器源走 `/device/api/stream.mjpg` |
+| 6 麦克风关 → 音频直线；开 → 显示波形 | 波形用 `mira_device` 的 AnalyserNode；采集器源用宿主推的 RMS |
+| 7 识别结果插话 / TTS 说话 | **插话在 `mira_device`**；**说话在 `mira_media`**（`device_say`），形象订阅 `say` 做气泡 + 口型 |
 | 9 背景「频谱环」 | `SpectrumRing`：麦克风开着用麦克风频谱、说话时用播放器频谱、都不是就呼吸波形 |
 | 8 设置界面 | 注册 `settings.section`（`@deepseek-ai/dsh-client-ui-settings`）→ **「形象」**：模型/目录/画布 |
 
@@ -50,8 +50,8 @@ $DSH_HOME/mira_config/muse_vtuber/
   model/                  可选：自己的模型目录（留空 modelsDir 时优先用它）
 ```
 
-**不再在这里**：`creds/dashscope.json`（→ `mira_config/mira_audio/creds/`）、
-`capture.json`（→ `mira_config/mira_input/capture.json`）。
+**不再在这里**：`creds/dashscope.json`（→ `mira_config/mira_media/creds/`）、
+`capture.json`（→ `mira_config/mira_device/capture.json`）。
 
 热生效：`config.json` 内容变了，下一次读取就重新加载（约定9）；换代码仍需重启宿主（§11 的坑）。
 
@@ -68,7 +68,7 @@ $DSH_HOME/mira_config/muse_vtuber/
 
 > 旧版（≤3.1.0）的 `camera` / `mic` / `tts` / `asr` / `vision` / `capture` / `events` 键
 > **不再被读取**，但会原样留在 `config.json` 里（前向兼容）；对应能力分别搬到了
-> `mira_input` / `mira_audio`（见 §9）。
+> `mira_device` / `mira_media`（见 §9）。
 
 ## 4. 工具（5 个）
 
@@ -100,21 +100,21 @@ $DSH_HOME/mira_config/muse_vtuber/
 
 | 旧 | 新 |
 |---|---|
-| `POST /vtuber/api/say`、`GET /vtuber/api/audio/<id>` | `POST /audio/api/say`、`GET /audio/api/audio/<id>` |
-| `POST /vtuber/api/asr`、`POST /vtuber/api/vision` | `POST /input/api/asr`、`POST /input/api/vision` |
-| `POST /vtuber/api/capture/*`、`GET /vtuber/api/stream.mjpg` | `/input/api/capture/*`、`/input/api/stream.mjpg` |
+| `POST /vtuber/api/say`、`GET /vtuber/api/audio/<id>` | `POST /media/api/say`、`GET /media/api/audio/<id>` |
+| `POST /vtuber/api/asr`、`POST /vtuber/api/vision` | `POST /device/api/asr`、`POST /device/api/vision` |
+| `POST /vtuber/api/capture/*`、`GET /vtuber/api/stream.mjpg` | `/device/api/capture/*`、`/device/api/stream.mjpg` |
 
 ## 6. 页面全局契约（形象读别的插件）
 
 ```js
-window.__miraAudio__ = { state(), subscribe(fn), level(), analyser(), play(url), ready(), version }
-window.__miraInput__ = { state(), subscribe(fn), videoStream(), analyser(), level(),
+window.__miraDevice__ = { state(), subscribe(fn), level(), analyser(), play(url), ready(), version }
+window.__miraDevice__ = { state(), subscribe(fn), videoStream(), analyser(), level(),
                          setCamera(on), setMic(on), setSource(kind, source), heard(), seen(), captureUrl() }
 ```
 
-- 形象**不自己播音频**：声音由 `mira_audio` 的全局播放器播，这里只读 `state().level` 驱动口型
+- 形象**不自己播音频**：声音由 `mira_media` 的全局播放器播，这里只读 `state().level` 驱动口型
   （两边都播会变成双重声音）。
-- 形象**不碰硬件**：视频/音频面板只消费 `mira_input` 的流、电平与日志。
+- 形象**不碰硬件**：视频/音频面板只消费 `mira_device` 的流、电平与日志。
 - 两个全局对象都可能比本模块**晚出现**（模块加载顺序不定），所以都做了短轮询 + 订阅。
 
 ## 7. 模型与资源缺失
@@ -135,24 +135,24 @@ vtuber_status → models.missing: [{ file: "SylviaMuse.4096/texture_02.png", why
 
 | 旧位置 | 新位置 |
 |---|---|
-| `muse_vtuber/config.json` 的 `tts` / `asr` / `mic.vad` | `mira_audio/config.json`（首次创建时自动迁移） |
-| `muse_vtuber/creds/dashscope.json` | `mira_audio/creds/dashscope.json`（首次加载时自动复制，600；旧文件保留） |
-| `muse_vtuber/config.json` 的 `camera` / `mic` / `capture` / `vision` / `events` | `mira_input/config.json`（首次创建时自动迁移） |
-| `muse_vtuber/capture.json` | `mira_input/capture.json`（`mira_input` 重新生成；`muse_galaxy` 已改读这里） |
-| `muse_vtuber/state.json` 的 `cameraOn/micOn/cameraSource/micSource` | `mira_input/state.json`（不迁移，重新点一次开关即可） |
-| 工具 `vtuber_say` | → `audio_say`（工具名变了，提示词/预设里如果写了要改） |
-| 工具 `vtuber_camera` / `vtuber_mic` / `vtuber_look` / `vtuber_listen` | → `input_camera` / `input_mic` / `input_look` / `input_listen` |
+| `muse_vtuber/config.json` 的 `tts` / `asr` / `mic.vad` | `mira_media/config.json`（首次创建时自动迁移） |
+| `muse_vtuber/creds/dashscope.json` | `mira_media/creds/dashscope.json`（首次加载时自动复制，600；旧文件保留） |
+| `muse_vtuber/config.json` 的 `camera` / `mic` / `capture` / `vision` / `events` | `mira_device/config.json`（首次创建时自动迁移） |
+| `muse_vtuber/capture.json` | `mira_device/capture.json`（`mira_device` 重新生成；`muse_galaxy` 已改读这里） |
+| `muse_vtuber/state.json` 的 `cameraOn/micOn/cameraSource/micSource` | `mira_device/state.json`（不迁移，重新点一次开关即可） |
+| 工具 `vtuber_say` | → `device_say`（工具名变了，提示词/预设里如果写了要改） |
+| 工具 `vtuber_camera` / `vtuber_mic` / `vtuber_look` / `vtuber_listen` | → `device_camera` / `device_mic` / `device_look` / `device_listen` |
 | 设置页「形象」里的 TTS/ASR/识图/设备 | → 「声音」/「输入」两个设置页；「形象」只剩 LIVE2D |
 
 迁移是**只读旧文件**、不删不改；回滚就停用三个新插件、重新启用旧 `muse_vtuber` 3.1.0。
 
 ## 9. 已知取舍
 
-1. **说话工具改了名字**：`vtuber_say` → `audio_say`。用户口径是"各自的能力归各自的插件"：
+1. **说话工具改了名字**：`vtuber_say` → `device_say`。用户口径是"各自的能力归各自的插件"：
    发声属于声音插件，形象只管口型。预设/技能里提到旧名字的要一起改。
-2. **插话不再由形象负责**：`events.*` 配置、限流、模板都搬到了 `mira_input`；形象不再需要
+2. **插话不再由形象负责**：`events.*` 配置、限流、模板都搬到了 `mira_device`；形象不再需要
    `sessionController`。
-3. **自动识图默认关**（`mira_input` 的 `vision.autoIntervalMs: 0`）：定时抓帧会持续消耗额度。
+3. **自动识图默认关**（`mira_device` 的 `vision.autoIntervalMs: 0`）：定时抓帧会持续消耗额度。
 4. **模型目录默认复用 mira_live2d 的那套**（存在才用）。
 5. LIVE2D 运行库是**复制**进来的，不是跨插件 import（`link:` 安装下跨包相对 import 不可靠）。
 6. 表情叠加用 `expressionManager._setExpression()`（下划线接口）：mira_live2d 已在生产用，
@@ -181,9 +181,9 @@ node ..\tool_shared\tools\check-kit.mjs
 |---|---|---|
 | 1 | 打开会议话界面 | 顶部页签：对话、轨迹、**形象** |
 | 2 | 点「形象」 | 主位出现 LIVE2D（或频谱环）；右侧 视频 / 音频 / LIVE2D 表情 |
-| 3 | 点输入框里的「摄像头」 | 侧边栏视频出现画面；再点一次黑屏（按钮属于 `mira_input`） |
-| 4 | 点「麦克风」说一句话 | 波形动；停顿后「听到：…（已插话）」；会话里多一条 `[感知·语音]`（插话由 `mira_input` 投递） |
-| 5 | 让模型说话（`audio_say` / 「设置 · 声音」的试听） | 形象出声、口型跟音量动、气泡显示文字 |
+| 3 | 点输入框里的「摄像头」 | 侧边栏视频出现画面；再点一次黑屏（按钮属于 `mira_device`） |
+| 4 | 点「麦克风」说一句话 | 波形动；停顿后「听到：…（已插话）」；会话里多一条 `[感知·语音]`（插话由 `mira_device` 投递） |
+| 5 | 让模型说话（`device_say` / 「设置 · 声音」的试听） | 形象出声、口型跟音量动、气泡显示文字 |
 | 6 | 设置 · 形象 → 选模型 → 保存 | 立即切换；空白 = 只显示频谱环 |
 | 7 | 把 `config.json` 的 `schemaVersion` 改成 99 再重载 | 工具报 `config/schema`，不静默清空 |
 
@@ -205,4 +205,4 @@ node ..\tool_shared\tools\check-kit.mjs
 - 所有工具返回 `{ ok:true, … }` 或 `{ ok:false, error:{ code, message, hint } }`。
 - 单实例保护：`apply` 里 `claimInstance('muse_vtuber')`，第二个实例报 `plugin/instance`。
 - 退场顺序：摘工具 → 卸路由 → 停 SSE → 落状态 → 放认领（`ctx.effect` 与装配失败走同一条路径）。
-- **依赖方向不允许反向**：形象可以读 `miraAudio` / `miraInput`，它们不反过来依赖形象。
+- **依赖方向不允许反向**：形象可以读 `miraMedia` / `miraDevice`，它们不反过来依赖形象。

@@ -4,9 +4,9 @@
  * 拆分之后本插件的自检只覆盖**形象自己**的东西：
  *   A kit 副本一致 / B 配置规整与模型目录 / C 配置仓库 / D 状态仓库 / E 模型与资源诊断
  *   F SSE 总线 / G HTTP 面（假 req/res）/ H 工具（5 个）/ I 「形象是一个账号」的权限
- *   J 入口装配（假 miraAudio / miraInput）、单实例、退场
+ *   J 入口装配（假 miraMedia / miraDevice）、单实例、退场
  *
- * 声音（TTS/ASR/VAD）的自检在 mira_audio，输入（摄像头/麦克风/采集器）的在 mira_input。
+ * 声音（TTS/ASR/VAD）的自检在 mira_media，输入（摄像头/麦克风/采集器）的在 mira_device。
  *
  * 跑法：node test/smoke.mjs        （退出码 0 = 全过；末行打印断言数）
  */
@@ -116,7 +116,7 @@ class FakeRes {
   }
 }
 
-/** 假 miraAudio：只需要 status()/vad()（形象只转述，不用它识别）。 */
+/** 假 miraMedia：只需要 status()/vad()（形象只转述，不用它识别）。 */
 const FAKE_AUDIO = {
   status() {
     return {
@@ -133,12 +133,12 @@ const FAKE_AUDIO = {
   },
 }
 
-/** 假 miraInput：形象只转述它的状态。 */
+/** 假 miraDevice：形象只转述它的状态。 */
 const FAKE_INPUT = {
   status() {
     return {
       ok: true,
-      plugin: 'mira_input',
+      plugin: 'mira_device',
       state: { cameraOn: true, micOn: false, cameraSource: 'galaxy', micSource: 'device' },
       vision: { enabled: true, provider: 'dsh', autoIntervalMs: 0 },
       capture: { enabled: true, sources: [{ captureId: 'cap-1' }], selected: { camera: 'cap-1', mic: '' } },
@@ -184,8 +184,8 @@ function makeCtx({ withAudio = true, withInput = true } = {}) {
       }
     },
   }
-  if (withAudio) ctx.miraAudio = FAKE_AUDIO
-  if (withInput) ctx.miraInput = FAKE_INPUT
+  if (withAudio) ctx.miraMedia = FAKE_AUDIO
+  if (withInput) ctx.miraDevice = FAKE_INPUT
   return ctx
 }
 
@@ -311,7 +311,7 @@ await t('D1 默认状态：可见、无模型、无表情、无动作', () => {
   assert.equal(state.model, '')
   assert.equal(state.expression, '')
   assert.deepEqual(state.toggles, [])
-  assert.equal(state.cameraOn, undefined, '摄像头开关属于 mira_input')
+  assert.equal(state.cameraOn, undefined, '摄像头开关属于 mira_device')
 })
 
 await t('D2 set 合并落盘、返回 changed；旧字段（cameraOn）被忽略', () => {
@@ -474,8 +474,8 @@ async function makeDeps({ modelsDir = MODELS_DIR } = {}) {
     assetsDir: join(ROOT, 'assets'),
     logger: { info() {}, warn() {}, debug() {} },
     counters,
-    audioStatus: () => FAKE_AUDIO.status(),
-    inputStatus: () => FAKE_INPUT.status(),
+    mediaStatus: () => FAKE_AUDIO.status(),
+    deviceStatus: () => FAKE_INPUT.status(),
   }
   deps.statusView = () => toolsMod.statusView(deps)
   const handler = routesMod.createHandler(deps)
@@ -629,8 +629,8 @@ async function makeToolEnv() {
     assetsDir: join(ROOT, 'assets'),
     logger: { info() {}, warn() {}, debug() {} },
     counters,
-    audioStatus: () => FAKE_AUDIO.status(),
-    inputStatus: () => FAKE_INPUT.status(),
+    mediaStatus: () => FAKE_AUDIO.status(),
+    deviceStatus: () => FAKE_INPUT.status(),
   }
   deps.statusView = () => toolsMod.statusView(deps)
   const ctx = makeCtx({})
@@ -768,7 +768,7 @@ await t('J3 enabled=false：不注册任何东西并返回 plugin/disabled', () 
   }
 })
 
-await t('J4 依赖缺失（没有 miraAudio / miraInput 时 status 如实报，装配仍成功）', async () => {
+await t('J4 依赖缺失（没有 miraMedia / miraDevice 时 status 如实报，装配仍成功）', async () => {
   const ctx = makeCtx({ withAudio: false, withInput: false })
   try {
     const result = indexMod.apply(ctx, { live2d: { modelsDir: MODELS_DIR } })

@@ -9,9 +9,9 @@
 # Every default below is documented in README.md (config table).
 #
 # Split (2026-11-01): this plugin now only draws the avatar.
-#   * speech (TTS / ASR / VAD) lives in mira_audio   -> /audio/api/*,  config mira_config/mira_audio
-#   * camera / mic / virtual capture lives in mira_input -> /input/api/*, config mira_config/mira_input
-#   * the Aliyun API key lives in mira_audio (creds/dashscope.json, mode 600)
+#   * speech (TTS / ASR / VAD) lives in mira_media   -> /media/api/*,  config mira_config/mira_media
+#   * camera / mic / virtual capture lives in mira_device -> /device/api/*, config mira_config/mira_device
+#   * the Aliyun API key lives in mira_media (creds/dashscope.json, mode 600)
 # Old keys (camera/mic/tts/asr/vision/capture/events) may still sit in an existing
 # config.json; they are left untouched but no longer read here (see README "migration").
 #

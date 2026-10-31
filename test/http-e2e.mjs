@@ -3,7 +3,7 @@
  *
  * 与 smoke.mjs 的分工：smoke 用假 req/res 逐分支断言（快、覆盖全），这里用真的 http 服务器 +
  * 真的 fetch（含 SSE 流），验证「装配 → 路由 → 静态 → 状态广播 → 设置页」这条链路真的通。
- * 不联网：形象侧已经没有第三方调用了（TTS/ASR/识图都在 mira_audio / mira_input 里）。
+ * 不联网：形象侧已经没有第三方调用了（TTS/ASR/识图都在 mira_media / mira_device 里）。
  *
  * 跑法：node test/http-e2e.mjs        （退出码 0 = 全过）
  */
@@ -87,8 +87,8 @@ function makeCtx() {
     get() {
       return undefined
     },
-    miraAudio: FAKE_AUDIO,
-    miraInput: FAKE_INPUT,
+    miraMedia: FAKE_AUDIO,
+    miraDevice: FAKE_INPUT,
     effect(fn) {
       disposers.push(fn())
       return () => {}
@@ -266,7 +266,7 @@ await t('E9 404：未知接口给 bootstrap 提示；旧接口（say/asr/vision�
     headers: { 'content-type': 'application/json', origin: ORIGIN },
     body: JSON.stringify({ text: 'x' }),
   })
-  assert.equal(say.status, 404, 'say 已经搬到 /audio/api/say')
+  assert.equal(say.status, 404, 'say 已经搬到 /media/api/say')
 })
 
 await t('E10 工具清单与模型清单一致（5 个）', async () => {
